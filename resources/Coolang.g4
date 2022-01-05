@@ -24,16 +24,18 @@ stat
  | funCall SCOL
  | returnStat
  | BREAK SCOL
- | OTHER {System.err.println("unknown char: " + $OTHER.text);}
+ | OTHER {System.err.println("unknown character: " + $OTHER.text);}
  ;
 
 returnStat: RETURN expr? SCOL;
 
-funDefinition: (FUN | mutability?) ID COL OPAR funDefinitionArgs? CPAR ARROW type ASSIGN funDefBody;
+funDefinition: (FUN | mutability?) ID COL OPAR funDefinitionArgs? CPAR ARROW funRetType ASSIGN funDefBody;
+
+funRetType: type | VOID_TYPE;
 
 funDefBody: statBlock | expr SCOL;
 
-lambda: OPAR funDefinitionArgs CPAR ARROW lambdaBody;
+lambda: OPAR funDefinitionArgs? CPAR ARROW lambdaBody;
 // because assignment as well as funDefBody require expr to end with semicolon I end up wth double semicolons
 // to solve it, I split funBody into two separate rules
 lambdaBody: statBlock | expr;
@@ -63,7 +65,7 @@ declarationWithAssignment
  : mutability? ID COL type ASSIGN expr SCOL
  ;
 
-type: INT_TYPE | STRING_TYPE | BOOL_TYPE | VOID_TYPE | funType;
+type: INT_TYPE | STRING_TYPE | BOOL_TYPE | funType;
 
 funType: OPAR (type (COMMA type)*)? CPAR ARROW type;
 

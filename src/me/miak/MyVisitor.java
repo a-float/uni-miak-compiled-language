@@ -60,10 +60,12 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         }
     }
 
+    // kind of unnecessary as functions can be declared as variables
+    // this is just a shorthand (that may introduce bugs)
     @Override
     public FType visitFunDefinition(CoolangParser.FunDefinitionContext ctx) {
         String id = ctx.ID().getText();
-        FType declaredReturnType = visit(ctx.type());
+        FType declaredReturnType = visit(ctx.funRetType());
         boolean isConst = ctx.mutability() == null || ctx.mutability().MUTABLE() == null;
         List<String> argIDs = new ArrayList<>();
         List<FType> argTypes = new ArrayList<>();
@@ -85,6 +87,10 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         FType returnType;
         if (ctx.funDefBody().statBlock() != null) {
             returnType = visit(ctx.funDefBody().statBlock());
+            // add implicit ret
+            if(returnType.type == Type.VOID && comms.get(comms.size() - 1).opcode != Opcode.VRET){
+                comms.add(new Instruction(Opcode.VRET));
+            }
         } else {
             returnType = visit(ctx.funDefBody().expr());
             comms.add(new Instruction(Opcode.RET)); // expr function bodies need explicit return
@@ -99,6 +105,10 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         if (!returnType.equals(declaredReturnType)) {
             errors.add(getErrorPos(ctx) + "Invalid return type in function " + id + ". Expected " + declaredReturnType + " got " + returnType);
         }
+        // functions start addresses are pushed onto stack on declaration
+        // just like other variables
+        comms.add(new Instruction(Opcode.CONST_I32));
+        comms.add(new Instruction(funType.startAddr));
         return new FType(Type.NULL);
     }
 
@@ -135,6 +145,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         }
         comms.add(new Instruction(Opcode.CONST_I32));
         comms.add(new Instruction(funcStart));
+        System.out.println("Lambda return type is " + returnType);
         // make sure actual return type is equal to the declared one
         return new FType(argFTypes, inferredReturnType, funcStart);
     }
@@ -175,6 +186,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         comms.add(new Instruction(Opcode.LOAD));
         comms.add(new Instruction(varInfo.addr));
         comms.add(new Instruction(Opcode.SCALL));
+        System.out.println(funInfo + " size " + funInfo.argFTypes.size());
         comms.add(new Instruction(funInfo.argFTypes.size()));
         return funInfo.returnType;
     }
@@ -183,7 +195,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     public FType visitOutStat(CoolangParser.OutStatContext ctx) {
         visit(ctx.expr());
         comms.add(new Instruction(Opcode.PRINT));
-        return new FType(Type.NULL);
+        return new FType(Type.VOID);
     }
 
     @Override
@@ -257,6 +269,12 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     }
 
     @Override
+    public FType visitFunRetType(CoolangParser.FunRetTypeContext ctx) {
+        if (ctx.VOID_TYPE() != null) return new FType(Type.VOID);
+        else return visit(ctx.type());
+    }
+
+    @Override
     public FType visitType(CoolangParser.TypeContext ctx) {
         Type type = Type.typeFromString(ctx.getText());
         if (type == Type.FUNC) {
@@ -288,7 +306,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             retTypes.add(retType);
             blockSizes.add(comms.size() - blockStart);
             comms.add(new Instruction(Opcode.JMP));
-            comms.add(new Instruction(nextJumps.get(nextJumps.size()-1)));
+            comms.add(new Instruction(nextJumps.get(nextJumps.size() - 1)));
             Instruction.map.put(nextBlockStart, comms.size() - falseJump - 1); // -1 for the jmp argument
         }
         if (ctx.statBlock() != null) {
@@ -302,8 +320,8 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
                 this.errors.add(getErrorPos(ctx) + "Different return types from if statement: " + retTypes.get(i - 1) + " and " + retTypes.get(i));
             }
         }
-        for(int i = 0; i < nextJumps.size(); i++){
-            int jmpVal = i == blockSizes.size()-1 ? 0 : blockSizes.get(i+1);
+        for (int i = 0; i < nextJumps.size(); i++) {
+            int jmpVal = i == blockSizes.size() - 1 ? 0 : blockSizes.get(i + 1);
             Instruction.map.put(nextJumps.get(i), jmpVal);
         }
         return retTypes.get(0);
@@ -364,6 +382,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         comms.add(new Instruction(currStackEnd));
         comms.add(new Instruction(Opcode.EQ_I32));
         comms.add(new Instruction(Opcode.JMPT));
+        int jmptStart = comms.size();
         comms.add(new Instruction(forEnd)); // stop looping
         FType toReturn = visit(ctx.statBlock());
         // decrease statBlock's POPN by one - don't remove iter
@@ -376,8 +395,8 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         comms.add(new Instruction(Opcode.STORE));
         comms.add(new Instruction(iter.addr));
         comms.add(new Instruction(Opcode.JMP));
-        comms.add(new Instruction(forStart));
-        Instruction.map.put(forEnd, comms.size() - forStart);
+        comms.add(new Instruction(forStart - comms.size() + 1));
+        Instruction.map.put(forEnd, comms.size() - jmptStart - 1);
         scopeManager.popScope();
         return toReturn;
     }
