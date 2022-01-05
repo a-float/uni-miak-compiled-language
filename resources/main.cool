@@ -1,5 +1,0 @@
-fun comp : (f1: (int) -> int, f2: () -> int) -> void = {
-    print f1(f2());
-}
-
-comp( (x: int) -> x*2, () -> 5 );

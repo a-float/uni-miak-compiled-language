@@ -7,7 +7,7 @@ public enum Type {
     STRING,
     FUNC,
     VOID,
-    ITERABLE;
+    ARRAY;
 
     public static Type typeFromString(String typeName) {
         return switch (typeName) {

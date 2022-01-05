@@ -14,20 +14,28 @@ public class VariableInfo {
         this.addr = addr;
     }
 
-    public void assign(String id, FType rightSideType) {
+    public void assign(String id, FType rightSideFType) {
         if (this.isConstant) {
             throw new RuntimeException("Can not assign to a constant variable " + id);
         }
-        if (this.ftype.type != rightSideType.type) {
-            throw new RuntimeException("Can not assign " + rightSideType + " to variable " + id);
-        }
         if (this.ftype.type == Type.FUNC) {
-            if (this.ftype.equals(rightSideType)) {
-                this.ftype.startAddr = rightSideType.startAddr;
+            if (this.ftype.equals(rightSideFType)) {
+                this.ftype.startAddr = rightSideFType.startAddr;
             } else {
-                throw new RuntimeException("Can not assign lambda " + rightSideType + " to name " + id);
-
+                throw new RuntimeException("Can not assign lambda " + rightSideFType + " to name " + id);
             }
+        }
+        else if (this.ftype.type != rightSideFType.type) {
+            throw new RuntimeException("Can not assign " + rightSideFType + " to variable " + id);
+        }
+    }
+
+    public void assignToArray(String id, FType rightSideFType){
+        if(this.ftype.type != Type.ARRAY){
+            throw new RuntimeException(id + " is not indexable");
+        }
+        if (!this.ftype.returnType.equals(rightSideFType)) {
+            throw new RuntimeException("Can not assign " + rightSideFType + " to element of array " + id);
         }
     }
 }

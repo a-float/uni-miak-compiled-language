@@ -10,6 +10,11 @@ import java.util.List;
 
 public class MyVisitor extends CoolangBaseVisitor<FType> {
 
+    // variables are set to 0 on declaration
+    // functions' addresses are set to -1, because 0 is a valid instruction address
+    // and non initialized functions should be known to be invalid
+    private static final int INIT_VAL = 0;
+    private static final int INIT_FUN = -1;
     public final ScopeManager scopeManager = new ScopeManager();
     private final List<Instruction> comms;
     private final List<String> errors;
@@ -34,6 +39,30 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         comms.addAll(0, funcs);     // function go first
         comms.add(new Instruction(Opcode.HALT));    // halt when done
         return new FType(Type.NULL);
+    }
+
+    @Override
+    public FType visitIdxAtom(CoolangParser.IdxAtomContext ctx) {
+        String id = ctx.ID().getText();
+        VariableInfo varInfo;
+        try {
+            varInfo = scopeManager.getVariableInfo(id);
+            if (varInfo.ftype.type != Type.ARRAY) {
+                throw new RuntimeException(id + " is not indexable");
+            }
+            FType idxType = visit(ctx.expr());
+            if(idxType.type != Type.INT){
+                throw new RuntimeException("Invalid index type: " + idxType.type);
+            }
+        } catch (RuntimeException e) {
+            errors.add(getErrorPos(ctx) + e.getMessage());
+            return new FType(Type.NULL);
+        }
+        comms.add(new Instruction(Opcode.CONST_I32));
+        comms.add(new Instruction(varInfo.addr));
+        comms.add(new Instruction(Opcode.ADD_I32));
+        comms.add(new Instruction(Opcode.SLOAD));
+        return varInfo.ftype.returnType;
     }
 
     @Override
@@ -88,7 +117,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         if (ctx.funDefBody().statBlock() != null) {
             returnType = visit(ctx.funDefBody().statBlock());
             // add implicit ret
-            if(returnType.type == Type.VOID && comms.get(comms.size() - 1).opcode != Opcode.VRET){
+            if (returnType.type == Type.VOID && comms.get(comms.size() - 1).opcode != Opcode.VRET) {
                 comms.add(new Instruction(Opcode.VRET));
             }
         } else {
@@ -136,6 +165,9 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             // expr function bodies may need explicit return
             if (returnType.type != Type.VOID) comms.add(new Instruction(Opcode.RET));
         }
+        if(returnType.type == Type.VOID && comms.get(comms.size()-1).opcode != Opcode.VRET){
+            comms.add(new Instruction(Opcode.VRET));
+        }
         FType inferredReturnType = returnType;
         scopeManager.popScope();
         List<Instruction> funcBody = comms.subList(oldCommsSize, comms.size());
@@ -152,7 +184,15 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
 
     @Override
     public FType visitFunCall(CoolangParser.FunCallContext ctx) {
-        String id = ctx.ID().getText();
+        boolean isIndexed = ctx.ID() == null;
+        String id, fullID;
+        if (isIndexed) {
+            id = ctx.idxAtom().ID().getText();
+            fullID = ctx.idxAtom().getText();
+        } else {
+            id = ctx.ID().getText();
+            fullID = id;
+        }
         List<FType> argFTypes = new ArrayList<>();
         CoolangParser.FunArgsContext actx = ctx.funArgs();
         if (actx != null) {
@@ -163,31 +203,52 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         VariableInfo varInfo;
         try {
             varInfo = scopeManager.getVariableInfo(id);
+            if (varInfo.ftype.type != Type.ARRAY && isIndexed) {
+                throw new RuntimeException(id + " is not indexable");
+            }
+            if (isIndexed) { // don't take array type, take array element type
+                varInfo = new VariableInfo(varInfo.ftype.returnType, varInfo.isConstant, 1, varInfo.addr);
+            }
             if (varInfo.ftype.type != Type.FUNC) {
-                throw new RuntimeException("Variable " + id + " is not callable");
+                throw new RuntimeException("Variable " + fullID + " is not callable");
             }
             if (varInfo.addr == -1) {
-                throw new RuntimeException("Function " + id + " is not defined");
+                throw new RuntimeException("Function " + fullID + " is not defined");
             }
         } catch (RuntimeException e) {
             errors.add(getErrorPos(ctx) + e.getMessage());
             return new FType(Type.NULL);
         }
         FType funInfo = varInfo.ftype;
+
         if (argFTypes.size() != funInfo.argFTypes.size()) {
             errors.add(getErrorPos(ctx) + "Expected " + funInfo.argFTypes.size() + " arguments but got " + argFTypes.size());
+            return new FType(Type.NULL);
         }
         for (int i = 0; i < argFTypes.size(); i++) {
             if (!argFTypes.get(i).equals(funInfo.argFTypes.get(i))) {
-                errors.add(getErrorPos(ctx) + "Function " + id + " expected arguments of types " + funInfo.argFTypes + " but got " + argFTypes);
+                errors.add(getErrorPos(ctx) + "Function " + fullID + " expected arguments of types " + funInfo.argFTypes + " but got " + argFTypes);
                 break;
             }
         }
-        comms.add(new Instruction(Opcode.LOAD));
-        comms.add(new Instruction(varInfo.addr));
-        comms.add(new Instruction(Opcode.SCALL));
-        System.out.println(funInfo + " size " + funInfo.argFTypes.size());
-        comms.add(new Instruction(funInfo.argFTypes.size()));
+        if (isIndexed) {
+            FType idxType = visit(ctx.idxAtom().expr());
+            if(idxType.type != Type.INT){
+                errors.add(getErrorPos(ctx.idxAtom().expr()) + " index must be an integer");
+                return new FType(Type.NULL);
+            }
+            comms.add(new Instruction(Opcode.CONST_I32));
+            comms.add(new Instruction(varInfo.addr));
+            comms.add(new Instruction(Opcode.ADD_I32));
+            comms.add(new Instruction(Opcode.SLOAD));
+            comms.add(new Instruction(Opcode.SCALL));
+            comms.add(new Instruction(funInfo.argFTypes.size()));
+        } else {
+            comms.add(new Instruction(Opcode.LOAD));
+            comms.add(new Instruction(varInfo.addr));
+            comms.add(new Instruction(Opcode.SCALL));
+            comms.add(new Instruction(funInfo.argFTypes.size()));
+        }
         return funInfo.returnType;
     }
 
@@ -199,26 +260,37 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     }
 
     @Override
+    public FType visitIndexedAtom(CoolangParser.IndexedAtomContext ctx) {
+        return visit(ctx.idxAtom());
+    }
+
+    @Override
     public FType visitAssignment(CoolangParser.AssignmentContext ctx) {
         FType exprType = visit(ctx.expr());
-        String id = ctx.ID().getText();
+        boolean isIndexed = ctx.ID() == null;
+        String id;
+        if (isIndexed) {
+            id = ctx.idxAtom().ID().getText();
+            visit(ctx.idxAtom());
+            comms.remove(comms.size()-1); // remove idxAtom SLOAD so that address stays on the stack
+        } else {
+            id = ctx.ID().getText();
+        }
         VariableInfo varInfo;
         try {
             varInfo = scopeManager.getVariableInfo(id);
-            varInfo.assign(id, exprType);
+            if(isIndexed)varInfo.assignToArray(id, exprType);
+            else varInfo.assign(id, exprType);
         } catch (RuntimeException e) {
             this.errors.add(getErrorPos(ctx) + e.getMessage());
             return new FType(Type.NULL);
         }
-        if (!varInfo.ftype.equals(exprType)) {
-            this.errors.add(getErrorPos(ctx) + "Tried to assign " + exprType + " to " + varInfo.ftype);
+        if(!isIndexed) {
+            comms.add(new Instruction(Opcode.STORE));
+            comms.add(new Instruction(varInfo.addr));
+        } else {
+            comms.add(new Instruction(Opcode.SSTORE));
         }
-//        if (varInfo.ftype.type == Type.FUNC) {
-//
-//        } else {
-        comms.add(new Instruction(Opcode.STORE));
-        comms.add(new Instruction(varInfo.addr));
-//        }
         return new FType(Type.NULL);
     }
 
@@ -230,7 +302,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         try {
             scopeManager.top().declare(ftype, ctx.ID().getText(), isConst, 1);
             comms.add(new Instruction(Opcode.CONST_I32));
-            comms.add(new Instruction(-1));  // init variables to -1
+            comms.add(new Instruction(ftype.type == Type.FUNC ? INIT_FUN : INIT_VAL));
         } catch (RuntimeException e) {
             errors.add(getErrorPos(ctx) + e.getMessage());
         }
@@ -261,10 +333,10 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     public FType visitFunType(CoolangParser.FunTypeContext ctx) {
         List<FType> argFTypes = new ArrayList<>();
         // the last type is the return type
-        for (int i = 0; i < ctx.type().size() - 1; i++) {
+        for (int i = 0; i < ctx.type().size(); i++) {
             argFTypes.add(visit(ctx.type(i)));
         }
-        FType returnFType = visit(ctx.type(ctx.type().size() - 1));
+        FType returnFType = visit(ctx.funRetType());
         return new FType(argFTypes, returnFType, -1);   // -1 should be overwritten during assignment
     }
 
@@ -276,6 +348,15 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
 
     @Override
     public FType visitType(CoolangParser.TypeContext ctx) {
+        if(ctx.OSQR() != null){ // is an array type
+            FType elemFType = new FType(Type.typeFromString(ctx.getText().substring(0, ctx.getText().length()-2)));
+            if(elemFType.type == Type.FUNC){
+                elemFType = visit(ctx.funType());
+            }
+            FType ret = new FType(Type.ARRAY);
+            ret.returnType = elemFType;
+            return ret;
+        }
         Type type = Type.typeFromString(ctx.getText());
         if (type == Type.FUNC) {
             return visit(ctx.funType());
@@ -454,11 +535,6 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     }
 
     @Override
-    public FType visitIndexedExpr(CoolangParser.IndexedExprContext ctx) {
-        return super.visitIndexedExpr(ctx);
-    }
-
-    @Override
     public FType visitUnaryMinusExpr(CoolangParser.UnaryMinusExprContext ctx) {
         visit(ctx.expr());
         comms.add(new Instruction(Opcode.CONST_I32));
@@ -468,10 +544,41 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     }
 
     @Override
+    public FType visitArrayCreation(CoolangParser.ArrayCreationContext ctx) {
+        String id = ctx.ID().getText();
+        int size;
+        try {
+            size = Integer.parseInt(ctx.expr().getText());
+            if(size <= 0)throw new RuntimeException();
+        } catch (RuntimeException e){
+            errors.add(getErrorPos(ctx.expr()) +"Array size is not a positive integer");
+            return new FType(Type.NULL);
+        }
+        FType ftype = visit(ctx.type());
+        FType arrType = new FType(Type.ARRAY);
+        arrType.returnType = ftype;
+        scopeManager.top().declare(arrType, id, true, size);    // TODO array always const? maybe change grammar
+        if(ftype.type == Type.FUNC){    // TODO add FILL-1 instr or smth
+            for(int i = 0; i < size; i++){
+                comms.add(new Instruction(Opcode.CONST_I32));
+                comms.add(new Instruction(-1));
+            }
+        } else {
+            comms.add(new Instruction(Opcode.FILLZ));
+            comms.add(new Instruction(size));
+        }
+        return new FType(Type.NULL);
+    }
+
+    @Override
     public FType visitMultiplicationExpr(CoolangParser.MultiplicationExprContext ctx) {
         FType returnType = visit(ctx.expr(0));
         visit(ctx.expr(1));
-        comms.add(new Instruction(Opcode.MUL_I32));
+        if (ctx.MULT() != null) {
+            comms.add(new Instruction(Opcode.MUL_I32));
+        } else {
+            comms.add(new Instruction(Opcode.DIV_I32));
+        }
         return returnType;
     }
 
@@ -493,33 +600,34 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
 
     @Override
     public FType visitAndExpr(CoolangParser.AndExprContext ctx) {
-        visit(ctx.expr(0));
-        visit(ctx.expr(1));
+        FType t1 = visit(ctx.expr(0));
+        FType t2 = visit(ctx.expr(1));
+        if(t1.type != Type.BOOL){
+            errors.add(getErrorPos(ctx) + "Expected BOOL got " + t1.type + ": " + ctx.expr(0).getText());
+        }
+        if(t2.type != Type.BOOL){
+            errors.add(getErrorPos(ctx) + "Expected BOOL got " + t2.type + ": " + ctx.expr(1).getText());
+        }
         comms.add(new Instruction(Opcode.MUL_I32));
         return new FType(Type.BOOL);
     }
 
     @Override
     public FType visitOrExpr(CoolangParser.OrExprContext ctx) {
-        visit(ctx.expr(0));
-        visit(ctx.expr(1));
-        comms.add(new Instruction(Opcode.MUL_I32));
+        FType t1 = visit(ctx.expr(0));
+        FType t2 = visit(ctx.expr(1));
+        if(t1.type != Type.BOOL){
+            errors.add(getErrorPos(ctx) + "Expected BOOL got " + t1.type + ": " + ctx.expr(0).getText());
+        }
+        if(t2.type != Type.BOOL){
+            errors.add(getErrorPos(ctx) + "Expected BOOL got " + t2.type + ": " + ctx.expr(1).getText());
+        }
+        comms.add(new Instruction(Opcode.ADD_I32)); // TODO could add OR vm instr (AND as well?)
+        comms.add(new Instruction(Opcode.CONST_I32));
+        comms.add(new Instruction(0));
+        comms.add(new Instruction(Opcode.LT_I32));
+        comms.add(new Instruction(Opcode.NOT));
         return new FType(Type.BOOL);
-    }
-
-    @Override
-    public FType visitIndexSingle(CoolangParser.IndexSingleContext ctx) {
-        return super.visitIndexSingle(ctx);
-    }
-
-    @Override
-    public FType visitIndexRange(CoolangParser.IndexRangeContext ctx) {
-        return super.visitIndexRange(ctx);
-    }
-
-    @Override
-    public FType visitRange(CoolangParser.RangeContext ctx) {
-        return super.visitRange(ctx);
     }
 
     @Override

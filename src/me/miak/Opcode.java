@@ -24,8 +24,11 @@ public enum Opcode {
     CALL(21),
     RET(22),
     SCALL(23),
-    VRET(24),
-    HALT(25);
+    SLOAD(24),
+    SSTORE(25),
+    FILLZ(26),
+    VRET(27),
+    HALT(28);
 
     private final int code;
 

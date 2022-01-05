@@ -1,0 +1,11 @@
+const bools = bool[5];
+bools[2] = true;
+bools[4] = true;
+
+mut i : int = 0;
+while i < 5{
+    if bools[i]{a
+        print i;
+    }
+    i = i + 1;
+}

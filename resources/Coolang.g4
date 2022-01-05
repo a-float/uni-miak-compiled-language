@@ -21,6 +21,7 @@ stat
  | outStat
  | whileStat
  | forStat
+ | arrayCreation
  | funCall SCOL
  | returnStat
  | BREAK SCOL
@@ -44,7 +45,7 @@ funDefinitionArgs
  : ID COL type (COMMA ID COL type)*
  ;
 
-funCall : ID OPAR funArgs? CPAR;
+funCall : (ID | idxAtom) OPAR funArgs? CPAR;
 
 funArgs
  : expr
@@ -54,20 +55,22 @@ funArgs
 outStat: PRINT expr SCOL;
 
 assignment
- : ID ASSIGN expr SCOL
+ : (ID | idxAtom) ASSIGN expr SCOL
  ;
 
 declaration
  : mutability? ID COL type SCOL
  ;
 
+arrayCreation : CONST ID ASSIGN type OSQR expr CSQR SCOL;
+
 declarationWithAssignment
  : mutability? ID COL type ASSIGN expr SCOL
  ;
 
-type: INT_TYPE | STRING_TYPE | BOOL_TYPE | funType;
+type: (INT_TYPE | STRING_TYPE | BOOL_TYPE | funType) (OSQR CSQR)?;
 
-funType: OPAR (type (COMMA type)*)? CPAR ARROW type;
+funType: OPAR (type (COMMA type)*)? CPAR ARROW funRetType;
 
 mutability : MUTABLE | CONST;
 
@@ -98,28 +101,24 @@ expr
  | expr op=(PLUS | MINUS) expr          #additiveExpr
  | expr op=(LTEQ | GTEQ | LT | GT) expr #relationalExpr
  | expr op=(EQ | NEQ) expr              #equalityExpr
- | expr AND expr                        #andExpr
+ | expr AND expr                        #andExpr    // and and or could be merged
  | expr OR expr                         #orExpr
  | OPAR expr CPAR                       #parExpr
- | expr OSQR index CSQR                 #indexedExpr
  | funCall                              #funExpr
  | atom                                 #atomExpr
  | MINUS expr                           #unaryMinusExpr
- ;
-
-index
- : expr     #indexSingle
- | range    #indexRange
  ;
 
 atom
  : INT                          #intAtom
  | (TRUE | FALSE)               #booleanAtom
  | ID                           #idAtom
+ | idxAtom                      #indexedAtom
  | STRING                       #stringAtom
  | lambda                       #lambdaAtom
-// | NIL                          #nilAtom
  ;
+
+idxAtom: ID OSQR expr CSQR;
 
 FUN: 'fun';
 CONST : 'const';

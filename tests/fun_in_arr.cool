@@ -1,0 +1,5 @@
+const funcs = (int) -> void[3];
+funcs[1] = (x:int) -> {print x;};
+funcs[1] = (x:int) -> {print x+10;};
+
+funcs[1](5);

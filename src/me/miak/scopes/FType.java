@@ -6,9 +6,9 @@ import java.util.stream.Collectors;
 
 public class FType {
     public Type type;   // used by regular variables
-    // the rest is used by lambdas and functions
+    // the rest is used by lambdas, functions and arrays
     public List<FType> argFTypes;
-    public FType returnType;
+    public FType returnType;    // array element type is stored here as well
     public Integer startAddr;
 
     public FType(Type type) {

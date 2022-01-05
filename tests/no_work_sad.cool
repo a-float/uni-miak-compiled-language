@@ -1,0 +1,16 @@
+
+fun f1: (x: int) -> void = {
+    print x;
+}
+
+fun main: () -> int = {
+    fun f1: (x: int) -> void = {
+        print x * 2;
+    }
+    print f1(5);
+    ret 1;
+}
+
+print f1(5);
+main();
+print f1(5);
