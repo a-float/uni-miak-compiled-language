@@ -38,13 +38,6 @@ public class Scope {
         return this.startAddr + this.totalSize;
     }
 
-//    public void declareFunction(FType ftype, String id, Boolean isConstant, int addr) {
-//        if (this.map.containsKey(id)) {
-//            throw new IllegalArgumentException("Name " + id + " already exists in the current scope");
-//        }
-//        this.map.put(id, new VariableInfo(ftype, isConstant, 1, addr));
-//    }
-
     public void declare(FType type, String id, Boolean isConstant, int size) {
         if (this.map.containsKey(id)) {
             throw new IllegalArgumentException("Name " + id + " already exists in the current scope");

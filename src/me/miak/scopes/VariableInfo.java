@@ -18,7 +18,6 @@ public class VariableInfo {
         if (this.isConstant) {
             throw new RuntimeException("Can not assign to a constant variable " + id);
         }
-        System.out.println(this.ftype + " " + rightSideType);
         if (this.ftype.type != rightSideType.type) {
             throw new RuntimeException("Can not assign " + rightSideType + " to variable " + id);
         }

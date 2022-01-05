@@ -334,7 +334,6 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         comms.add(new Instruction(Opcode.JMPF));
         comms.add(new Instruction(whileEnd));
         FType retType = visit(ctx.statBlock());
-        System.out.println(comms.size() + " " + whileStart);
         comms.add(new Instruction(Opcode.JMP));
         comms.add(new Instruction(whileStart - comms.size() - 1));
         Instruction.map.put(whileEnd, comms.size() - beforeJMPF - 2);
