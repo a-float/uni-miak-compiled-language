@@ -1,0 +1,4 @@
+for a in 4 to 10 by 2 {
+    a = a - 1;
+    print a;
+}

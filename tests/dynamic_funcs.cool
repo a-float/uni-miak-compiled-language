@@ -1,0 +1,12 @@
+mut f1: (int) -> int;
+
+const x : int = 7;
+if x > 10{
+    print 11;
+   f1 = (x : int) -> x+10;
+} else {
+    print 22;
+   f1 = (x: int) -> x - 200;
+}
+
+print f1(5);

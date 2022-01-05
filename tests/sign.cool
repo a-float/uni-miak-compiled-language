@@ -1,0 +1,12 @@
+fun f2: (x: int) -> int = {
+    if x > 0 {
+        ret 1;
+    } elif x == 0 {
+        ret 0;
+    } else {
+        ret -1;
+    }
+}
+print(f2(10));
+print(f2(0));
+print(f2(-100));
