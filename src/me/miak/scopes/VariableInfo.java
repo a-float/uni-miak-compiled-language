@@ -29,13 +29,4 @@ public class VariableInfo {
             throw new RuntimeException("Can not assign " + rightSideFType + " to variable " + id);
         }
     }
-
-    public void assignToArray(String id, FType rightSideFType){
-        if(this.ftype.type != Type.ARRAY){
-            throw new RuntimeException(id + " is not indexable");
-        }
-        if (!this.ftype.returnType.equals(rightSideFType)) {
-            throw new RuntimeException("Can not assign " + rightSideFType + " to element of array " + id);
-        }
-    }
 }

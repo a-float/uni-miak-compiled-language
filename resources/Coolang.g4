@@ -37,8 +37,9 @@ funRetType: type | VOID_TYPE;
 funDefBody: statBlock | expr SCOL;
 
 lambda: OPAR funDefinitionArgs? CPAR ARROW lambdaBody;
-// because assignment as well as funDefBody require expr to end with semicolon I end up wth double semicolons
-// to solve it, I split funBody into two separate rules
+// because assignment and funDefBody require expr to end with a semicolon
+// I end up with double semicolons
+// to solve this, I split funBody into two separate rules
 lambdaBody: statBlock | expr;
 
 funDefinitionArgs
@@ -62,7 +63,8 @@ declaration
  : mutability? ID COL type SCOL
  ;
 
-arrayCreation : CONST ID ASSIGN type OSQR expr CSQR SCOL;
+// TODO split into static array and dynamic array ('new' keyword?)
+arrayCreation : CONST ID ASSIGN type (OSQR expr CSQR)+ SCOL;
 
 declarationWithAssignment
  : mutability? ID COL type ASSIGN expr SCOL
@@ -118,7 +120,7 @@ atom
  | lambda                       #lambdaAtom
  ;
 
-idxAtom: ID OSQR expr CSQR;
+idxAtom: ID (OSQR expr CSQR)+;
 
 FUN: 'fun';
 CONST : 'const';

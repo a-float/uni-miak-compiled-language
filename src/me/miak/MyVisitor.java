@@ -50,19 +50,35 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             if (varInfo.ftype.type != Type.ARRAY) {
                 throw new RuntimeException(id + " is not indexable");
             }
-            FType idxType = visit(ctx.expr());
-            if(idxType.type != Type.INT){
-                throw new RuntimeException("Invalid index type: " + idxType.type);
-            }
         } catch (RuntimeException e) {
             errors.add(getErrorPos(ctx) + e.getMessage());
             return new FType(Type.NULL);
         }
-        comms.add(new Instruction(Opcode.CONST_I32));
+        FType currFtype = varInfo.ftype;
+        // check if all indices are INTs
+        for (int i = 0; i < ctx.expr().size(); i++) {
+            if (currFtype.type != Type.ARRAY) {
+                errors.add(getErrorPos(ctx) + "Type " + currFtype.type + " is not indexable");
+                return new FType(Type.NULL);
+            }
+            FType idxType = visit(ctx.expr(i));
+            if (idxType.type != Type.INT) {
+                errors.add(getErrorPos(ctx) + "Invalid index type: " + idxType.type);
+                return new FType(Type.NULL);
+            }
+            comms.add(new Instruction(Opcode.CONST_I32)); // multiply part of the index by the sub-array's size
+            comms.add(new Instruction(currFtype.returnType.arrSize));
+            comms.add(new Instruction(Opcode.MUL_I32));
+            if (i != 0) {   // if not first, start adding up the indices
+                comms.add(new Instruction(Opcode.ADD_I32));
+            }
+            currFtype = currFtype.returnType;
+        }
+        comms.add(new Instruction(Opcode.CONST_I32)); // add the start of the array to get the final index
         comms.add(new Instruction(varInfo.addr));
         comms.add(new Instruction(Opcode.ADD_I32));
-        comms.add(new Instruction(Opcode.SLOAD));
-        return varInfo.ftype.returnType;
+        comms.add(new Instruction(Opcode.SLOAD));   // and load the value
+        return currFtype;
     }
 
     @Override
@@ -165,7 +181,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             // expr function bodies may need explicit return
             if (returnType.type != Type.VOID) comms.add(new Instruction(Opcode.RET));
         }
-        if(returnType.type == Type.VOID && comms.get(comms.size()-1).opcode != Opcode.VRET){
+        if (returnType.type == Type.VOID && comms.get(comms.size() - 1).opcode != Opcode.VRET) {
             comms.add(new Instruction(Opcode.VRET));
         }
         FType inferredReturnType = returnType;
@@ -177,7 +193,6 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         }
         comms.add(new Instruction(Opcode.CONST_I32));
         comms.add(new Instruction(funcStart));
-        System.out.println("Lambda return type is " + returnType);
         // make sure actual return type is equal to the declared one
         return new FType(argFTypes, inferredReturnType, funcStart);
     }
@@ -195,18 +210,19 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         }
         List<FType> argFTypes = new ArrayList<>();
         CoolangParser.FunArgsContext actx = ctx.funArgs();
-        if (actx != null) {
+        if (actx != null) { // visit all function call arguments, and store their ftypes
             for (int i = 0; i < actx.expr().size(); i++) {
                 argFTypes.add(visit(actx.expr(i)));
             }
         }
         VariableInfo varInfo;
+        // make sure it's callable
         try {
             varInfo = scopeManager.getVariableInfo(id);
             if (varInfo.ftype.type != Type.ARRAY && isIndexed) {
                 throw new RuntimeException(id + " is not indexable");
             }
-            if (isIndexed) { // don't take array type, take array element type
+            if (isIndexed) { // take array element type instead of ArrayType
                 varInfo = new VariableInfo(varInfo.ftype.returnType, varInfo.isConstant, 1, varInfo.addr);
             }
             if (varInfo.ftype.type != Type.FUNC) {
@@ -220,7 +236,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             return new FType(Type.NULL);
         }
         FType funInfo = varInfo.ftype;
-
+        // assert arguments' types are what the function expects
         if (argFTypes.size() != funInfo.argFTypes.size()) {
             errors.add(getErrorPos(ctx) + "Expected " + funInfo.argFTypes.size() + " arguments but got " + argFTypes.size());
             return new FType(Type.NULL);
@@ -232,15 +248,15 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             }
         }
         if (isIndexed) {
-            FType idxType = visit(ctx.idxAtom().expr());
-            if(idxType.type != Type.INT){
-                errors.add(getErrorPos(ctx.idxAtom().expr()) + " index must be an integer");
-                return new FType(Type.NULL);
-            }
-            comms.add(new Instruction(Opcode.CONST_I32));
-            comms.add(new Instruction(varInfo.addr));
-            comms.add(new Instruction(Opcode.ADD_I32));
-            comms.add(new Instruction(Opcode.SLOAD));
+            FType idxType = visit(ctx.idxAtom());
+//            if (idxType.type != Type.INT) {
+//                errors.add(getErrorPos(ctx.idxAtom().expr()) + " index must be an integer");
+//                return new FType(Type.NULL);
+//            }
+//            comms.add(new Instruction(Opcode.CONST_I32));
+//            comms.add(new Instruction(varInfo.addr));
+//            comms.add(new Instruction(Opcode.ADD_I32));
+//            comms.add(new Instruction(Opcode.SLOAD));
             comms.add(new Instruction(Opcode.SCALL));
             comms.add(new Instruction(funInfo.argFTypes.size()));
         } else {
@@ -269,23 +285,29 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         FType exprType = visit(ctx.expr());
         boolean isIndexed = ctx.ID() == null;
         String id;
+        FType ltype = null;
         if (isIndexed) {
             id = ctx.idxAtom().ID().getText();
-            visit(ctx.idxAtom());
-            comms.remove(comms.size()-1); // remove idxAtom SLOAD so that address stays on the stack
+            ltype = visit(ctx.idxAtom());
+            comms.remove(comms.size() - 1); // remove idxAtom SLOAD so that address stays on the stack
         } else {
             id = ctx.ID().getText();
         }
         VariableInfo varInfo;
         try {
             varInfo = scopeManager.getVariableInfo(id);
-            if(isIndexed)varInfo.assignToArray(id, exprType);
-            else varInfo.assign(id, exprType);
+            if (isIndexed) {
+                if (ltype.type == Type.ARRAY) {
+                    throw new RuntimeException("Invalid assignment to an expression of type ARRAY");
+                } else if (!ltype.equals(exprType)) {
+                    throw new RuntimeException("Invalid assignment of expression of type " + exprType + " to an array of " + ltype);
+                }
+            } else varInfo.assign(id, exprType);
         } catch (RuntimeException e) {
             this.errors.add(getErrorPos(ctx) + e.getMessage());
             return new FType(Type.NULL);
         }
-        if(!isIndexed) {
+        if (!isIndexed) {
             comms.add(new Instruction(Opcode.STORE));
             comms.add(new Instruction(varInfo.addr));
         } else {
@@ -348,9 +370,9 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
 
     @Override
     public FType visitType(CoolangParser.TypeContext ctx) {
-        if(ctx.OSQR() != null){ // is an array type
-            FType elemFType = new FType(Type.typeFromString(ctx.getText().substring(0, ctx.getText().length()-2)));
-            if(elemFType.type == Type.FUNC){
+        if (ctx.OSQR() != null) { // is an array type
+            FType elemFType = new FType(Type.typeFromString(ctx.getText().substring(0, ctx.getText().length() - 2)));
+            if (elemFType.type == Type.FUNC) {
                 elemFType = visit(ctx.funType());
             }
             FType ret = new FType(Type.ARRAY);
@@ -408,6 +430,9 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         return retTypes.get(0);
     }
 
+    /*
+    Cleans up all the variables created in its scope
+     */
     @Override
     public FType visitStatBlock(CoolangParser.StatBlockContext ctx) {
         FType toReturn = visit(ctx.block());
@@ -454,6 +479,9 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         int forStart = comms.size();
         String forEnd = Instruction.getLabelName("forEnd");
         scopeManager.pushScope();
+        // modifying scope start address, to get two anonymous variables used for looping
+        // because the scope start has been modified, these variables will not be automatically released
+        // one has to pop them manually when the for loop ends
         scopeManager.top().modifyStartAddr(2);
         scopeManager.top().declare(visit(rctx.expr(0)), ctx.ID().getText(), false, 1);
         VariableInfo iter = scopeManager.top().getVariableInfo(ctx.ID().getText());
@@ -466,8 +494,13 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         int jmptStart = comms.size();
         comms.add(new Instruction(forEnd)); // stop looping
         FType toReturn = visit(ctx.statBlock());
-        // decrease statBlock's POPN by one - don't remove iter
-        comms.set(comms.size() - 1, new Instruction(comms.get(comms.size() - 1).immVal - 1));
+        // decrease statBlock's POPN by one so that it doesn't remove the iterators value
+        if (comms.get(comms.size() - 1).immVal == 1) { // avoid creating POPN 0
+            comms.remove(comms.size() - 1);
+            comms.remove(comms.size() - 1);
+        } else {
+            comms.set(comms.size() - 1, new Instruction(comms.get(comms.size() - 1).immVal - 1));
+        }
         comms.add(new Instruction(Opcode.LOAD));
         comms.add(new Instruction(iter.addr));
         comms.add(new Instruction(Opcode.LOAD));
@@ -478,6 +511,8 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         comms.add(new Instruction(Opcode.JMP));
         comms.add(new Instruction(forStart - comms.size() + 1));
         Instruction.map.put(forEnd, comms.size() - jmptStart - 1);
+        comms.add(new Instruction(Opcode.POPN));
+        comms.add(new Instruction(3)); // pop iter, end and step values
         scopeManager.popScope();
         return toReturn;
     }
@@ -546,26 +581,42 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     @Override
     public FType visitArrayCreation(CoolangParser.ArrayCreationContext ctx) {
         String id = ctx.ID().getText();
-        int size;
-        try {
-            size = Integer.parseInt(ctx.expr().getText());
-            if(size <= 0)throw new RuntimeException();
-        } catch (RuntimeException e){
-            errors.add(getErrorPos(ctx.expr()) +"Array size is not a positive integer");
-            return new FType(Type.NULL);
+        ArrayList<Integer> sizes = new ArrayList<>();
+        for (int i = 0; i < ctx.expr().size(); i++) {
+            try {
+                int size = Integer.parseInt(ctx.expr(i).getText());
+                if (size <= 0) throw new RuntimeException();
+                sizes.add(size);
+            } catch (RuntimeException e) {
+                errors.add(getErrorPos(ctx.expr(i)) + "Array size is not a positive integer");
+                return new FType(Type.NULL);
+            }
         }
-        FType ftype = visit(ctx.type());
-        FType arrType = new FType(Type.ARRAY);
-        arrType.returnType = ftype;
-        scopeManager.top().declare(arrType, id, true, size);    // TODO array always const? maybe change grammar
-        if(ftype.type == Type.FUNC){    // TODO add FILL-1 instr or smth
-            for(int i = 0; i < size; i++){
+        // multiply to get real nested sub-arrays' sizes
+        // each FTypes' arrSize is the sum of all its children sizes
+        for (int i = sizes.size() - 2; i >= 0; i--) {
+            sizes.set(i, sizes.get(i + 1) * sizes.get(i));
+        }
+        FType finalType = visit(ctx.type());
+        FType rootFtype = new FType(Type.ARRAY);
+        rootFtype.arrSize = sizes.get(0);
+        FType subFtype = rootFtype;
+        for (int i = 1; i < sizes.size(); i++) {
+            subFtype.returnType = new FType(Type.ARRAY);
+            subFtype = subFtype.returnType;
+            subFtype.arrSize = sizes.get(i);
+        }
+        subFtype.returnType = finalType;
+        finalType.arrSize = 1; // though it's not really an array
+        scopeManager.top().declare(rootFtype, id, true, rootFtype.arrSize);    // TODO array always const? maybe change grammar
+        if (rootFtype.type == Type.FUNC) {    // TODO add FILL-1 instr or smth
+            for (int i = 0; i < rootFtype.arrSize; i++) {
                 comms.add(new Instruction(Opcode.CONST_I32));
                 comms.add(new Instruction(-1));
             }
         } else {
             comms.add(new Instruction(Opcode.FILLZ));
-            comms.add(new Instruction(size));
+            comms.add(new Instruction(rootFtype.arrSize));
         }
         return new FType(Type.NULL);
     }
@@ -602,10 +653,10 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     public FType visitAndExpr(CoolangParser.AndExprContext ctx) {
         FType t1 = visit(ctx.expr(0));
         FType t2 = visit(ctx.expr(1));
-        if(t1.type != Type.BOOL){
+        if (t1.type != Type.BOOL) {
             errors.add(getErrorPos(ctx) + "Expected BOOL got " + t1.type + ": " + ctx.expr(0).getText());
         }
-        if(t2.type != Type.BOOL){
+        if (t2.type != Type.BOOL) {
             errors.add(getErrorPos(ctx) + "Expected BOOL got " + t2.type + ": " + ctx.expr(1).getText());
         }
         comms.add(new Instruction(Opcode.MUL_I32));
@@ -616,10 +667,10 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     public FType visitOrExpr(CoolangParser.OrExprContext ctx) {
         FType t1 = visit(ctx.expr(0));
         FType t2 = visit(ctx.expr(1));
-        if(t1.type != Type.BOOL){
+        if (t1.type != Type.BOOL) {
             errors.add(getErrorPos(ctx) + "Expected BOOL got " + t1.type + ": " + ctx.expr(0).getText());
         }
-        if(t2.type != Type.BOOL){
+        if (t2.type != Type.BOOL) {
             errors.add(getErrorPos(ctx) + "Expected BOOL got " + t2.type + ": " + ctx.expr(1).getText());
         }
         comms.add(new Instruction(Opcode.ADD_I32)); // TODO could add OR vm instr (AND as well?)

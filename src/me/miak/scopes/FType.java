@@ -10,6 +10,7 @@ public class FType {
     public List<FType> argFTypes;
     public FType returnType;    // array element type is stored here as well
     public Integer startAddr;
+    public Integer arrSize;
 
     public FType(Type type) {
         this.type = type;
@@ -24,10 +25,13 @@ public class FType {
 
     @Override
     public String toString() {
-        if (this.type != Type.FUNC) return type.toString();
-        else {
+        if (this.type == Type.FUNC) {
             String args = this.argFTypes.stream().map(FType::toString).collect(Collectors.joining(", "));
             return "(" + args + ") -> " + this.returnType;
+        } else if (this.type == Type.ARRAY) {
+            return this.returnType.toString() + "[]";
+        } else {
+            return type.toString();
         }
     }
 
