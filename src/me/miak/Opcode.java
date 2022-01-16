@@ -19,16 +19,17 @@ public enum Opcode {
     STORE(16),
     GSTORE(17),
     PRINT(18),
-    POP(19),
-    POPN(20),
-    CALL(21),
-    RET(22),
-    SCALL(23),
-    SLOAD(24),
-    SSTORE(25),
-    FILLZ(26),
-    VRET(27),
-    HALT(28);
+    PRINTCH(19),
+    POP(20),
+    POPN(21),
+    CALL(22),
+    RET(23),
+    SCALL(24),
+    SLOAD(25),
+    SSTORE(26),
+    FILLZ(27),
+    VRET(28),
+    HALT(29);
 
     private final int code;
 

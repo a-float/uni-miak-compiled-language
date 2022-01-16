@@ -9,18 +9,19 @@ public class FType {
     // the rest is used by lambdas, functions and arrays
     public List<FType> argFTypes;
     public FType returnType;    // array element type is stored here as well
-    public Integer startAddr;
     public Integer arrSize;
 
     public FType(Type type) {
         this.type = type;
     }
 
-    public FType(List<FType> argFTypes, FType returnFType, int startAddr) {
+    /*
+    Constructor for functions
+     */
+    public FType(List<FType> argFTypes, FType returnFType) {
         this.type = Type.FUNC;
         this.argFTypes = argFTypes;
         this.returnType = returnFType;
-        this.startAddr = startAddr;
     }
 
     @Override

@@ -46,7 +46,7 @@ funDefinitionArgs
  : ID COL type (COMMA ID COL type)*
  ;
 
-funCall : (ID | idxAtom) OPAR funArgs? CPAR;
+funCall : (id | idxAtom) OPAR funArgs? CPAR;
 
 funArgs
  : expr
@@ -114,12 +114,13 @@ expr
 atom
  : INT                          #intAtom
  | (TRUE | FALSE)               #booleanAtom
- | ID                           #idAtom
+ | id                           #idAtom
  | idxAtom                      #indexedAtom
  | STRING                       #stringAtom
  | lambda                       #lambdaAtom
  ;
 
+id: ID;
 idxAtom: ID (OSQR expr CSQR)+;
 
 FUN: 'fun';
