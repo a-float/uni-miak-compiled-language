@@ -42,6 +42,7 @@ public class Scope {
         if (this.map.containsKey(id)) {
             throw new IllegalArgumentException("Name " + id + " already exists in the current scope");
         }
+//        System.out.println("Putting " + id + " at addr " + this.startAddr + " + " + this.totalSize + " fp " + this.framePointer);
         this.map.put(id, new VariableInfo(type, isConstant, size, this.startAddr + this.totalSize));
         this.totalSize += size;
     }

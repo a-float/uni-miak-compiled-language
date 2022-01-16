@@ -1,0 +1,13 @@
+fun test: (p: int*) -> void = {
+    const arr = int[6];
+    arr[0] = 6;
+    *p = 9;
+    print arr;
+    print arr[0];
+    print p;
+    print p[0];
+}
+
+const a: int = 1;
+mut p: int* = &a;
+test(p);

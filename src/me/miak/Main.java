@@ -62,7 +62,7 @@ public class Main {
         MyVisitor visitor = new MyVisitor(comms, errors);
         visitor.visit(tree);
         if (errors.size() > 0) {
-            System.out.println("Found " + errors.size() + " errors while compiling:");
+            System.out.println("Found " + errors.size() + " error" + (errors.size() != 1 ? "s" : "") + " while compiling:");
             errors.forEach(System.out::println);
             return false;
         }

@@ -1,14 +1,14 @@
 package me.miak.scopes;
 
 public enum Type {
-    NULL,
+    NULL,   // returned when an error occurred
     INT,
     BOOL,
     STRING,
     FUNC,
-    VOID,
-    ARRAY,
-    POINTER;
+    VOID,   // returned when there was nothing special to return e.g. assignment could return rvalue but now returns void
+    ARRAY,  // always accessed using local addresses
+    POINTER;    // always accessed using global addresses
 
     public static Type typeFromString(String typeName) {
         return switch (typeName) {

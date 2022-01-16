@@ -1,3 +1,14 @@
+mut c: int = 2;
+
+fun a: (x: int) -> void = {
+    print x;
+    print c;
+    ret;
+}
+
+a(3);
+/////////////////
+
 mut a : int = 2;
 print a;
 mut b : int;

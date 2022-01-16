@@ -46,7 +46,7 @@ funDefinitionArgs
  : ID COL type (COMMA ID COL type)*
  ;
 
-funCall : (id | idxAtom) OPAR funArgs? CPAR;
+funCall : lvalue OPAR funArgs? CPAR;
 
 funArgs
  : expr
@@ -56,7 +56,7 @@ funArgs
 outStat: PRINT expr SCOL;
 
 assignment
- : (ID | idxAtom) ASSIGN expr SCOL
+ : lvalue ASSIGN expr SCOL
  ;
 
 declaration
@@ -70,7 +70,7 @@ declarationWithAssignment
  : mutability? ID COL type ASSIGN expr SCOL
  ;
 
-type: (INT_TYPE | STRING_TYPE | BOOL_TYPE | funType) (OSQR CSQR)?;
+type: (INT_TYPE | STRING_TYPE | BOOL_TYPE | funType) MULT*;
 
 funType: OPAR (type (COMMA type)*)? CPAR ARROW funRetType;
 
@@ -99,6 +99,8 @@ range : expr TO expr BY expr;
 expr
  :<assoc=right> expr POW expr           #powExpr
  | NOT expr                             #notExpr
+ | ptrExpr                              #pointerExpr
+ | AMP lvalue                           #addressExpr
  | expr op=(MULT | DIV | MOD) expr      #multiplicationExpr
  | expr op=(PLUS | MINUS) expr          #additiveExpr
  | expr op=(LTEQ | GTEQ | LT | GT) expr #relationalExpr
@@ -120,8 +122,11 @@ atom
  | lambda                       #lambdaAtom
  ;
 
+lvalue: id | idxAtom | ptrExpr;
+
 id: ID;
-idxAtom: ID (OSQR expr CSQR)+;
+idxAtom: (id | ptrExpr) (OSQR expr CSQR)+;
+ptrExpr: MULT expr;
 
 FUN: 'fun';
 CONST : 'const';
@@ -145,6 +150,7 @@ NOT : 'not';
 HASH: '#';
 BY: 'by';
 TO: 'to';
+AMP: '&';
 
 INT_TYPE: 'int';
 STRING_TYPE: 'string';

@@ -1,5 +1,11 @@
-const funcs = (int) -> void[3][2];
-funcs[1][1] = (x:int) -> {print x;};
-funcs[1][1] = (x:int) -> {print x+10;};
+fun f: (x : int[]) -> void = {
+    for i in 0 to 3 by 1{
+        x[i] = i;
+    }
+}
 
-funcs[1][1](5);
+const arr = int[4];
+f(arr);
+for i in 0 to 3 by 1{
+    print arr[i];
+}

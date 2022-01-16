@@ -1,6 +1,6 @@
 package me.miak.scopes;
 
-public class VariableInfo {
+public class VariableInfo{
     public final boolean isConstant;
     public final FType ftype;
     public final int size;
@@ -10,12 +10,12 @@ public class VariableInfo {
     public VariableInfo(FType ftype, boolean isConstant, int size, int addr) {
         this.ftype = ftype;
         this.isConstant = isConstant;
-        this.size = size;
+        this.size = size;   // always 1
         this.addr = addr;
     }
 
     public void assign(String id, FType rightSideFType) {
-        if (this.isConstant) {
+        if (this.isConstant || this.ftype.type == Type.ARRAY) {
             throw new RuntimeException("Can not assign to a constant variable " + id);
         }
         if (this.ftype.type == Type.FUNC) {

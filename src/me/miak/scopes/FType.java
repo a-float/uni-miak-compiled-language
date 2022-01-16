@@ -15,9 +15,7 @@ public class FType {
         this.type = type;
     }
 
-    /*
-    Constructor for functions
-     */
+    /* Constructor for functions */
     public FType(List<FType> argFTypes, FType returnFType) {
         this.type = Type.FUNC;
         this.argFTypes = argFTypes;
@@ -31,6 +29,8 @@ public class FType {
             return "(" + args + ") -> " + this.returnType;
         } else if (this.type == Type.ARRAY) {
             return this.returnType.toString() + "[]";
+        }else if (this.type == Type.POINTER){
+            return this.returnType.toString() + "*";
         } else {
             return type.toString();
         }
@@ -50,7 +50,9 @@ public class FType {
             return false;
         FType ftype = (FType) other;
         // field comparison
-        return type == ftype.type &&
+        return (type == ftype.type ||
+                (type == Type.ARRAY && ftype.type == Type.POINTER) ||   // allow casting between pointers and arrays
+                (type == Type.POINTER && ftype.type == Type.ARRAY)) &&
                 Objects.equals(this.argFTypes, ftype.argFTypes) &&
                 Objects.equals(this.returnType, ftype.returnType);
     }

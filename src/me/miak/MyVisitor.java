@@ -38,52 +38,51 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         funcs.add(0, new Instruction(funcs.size()));    // starting instruction number first
         comms.addAll(0, funcs);     // function go first
         comms.add(new Instruction(Opcode.HALT));    // halt when done
-        return new FType(Type.NULL);
+        return new FType(Type.VOID);
     }
 
     @Override
     public FType visitIdxAtom(CoolangParser.IdxAtomContext ctx) {
-        String id = ctx.ID().getText();
-        VariableInfo varInfo;
-        try {
-            varInfo = scopeManager.getVariableInfo(id);
-            if (varInfo.ftype.type != Type.ARRAY) {
-                throw new RuntimeException(id + " is not indexable");
-            }
-        } catch (RuntimeException e) {
-            errors.add(getErrorPos(ctx) + e.getMessage());
-            return new FType(Type.NULL);
-        }
-        FType currFtype = varInfo.ftype;
-        // check if all indices are INTs
+        FType currFType = ctx.id() != null ? visit(ctx.id()) : visit(ctx.ptrExpr());
         for (int i = 0; i < ctx.expr().size(); i++) {
-            if (currFtype.type != Type.ARRAY) {
-                errors.add(getErrorPos(ctx) + "Type " + currFtype.type + " is not indexable");
+            if (currFType.type != Type.ARRAY && currFType.type != Type.POINTER) {
+                errors.add(getErrorPos(ctx) + "Type " + currFType.type + " is not indexable");
                 return new FType(Type.NULL);
             }
             FType idxType = visit(ctx.expr(i));
+            // check if all indices are INTs
             if (idxType.type != Type.INT) {
                 errors.add(getErrorPos(ctx) + "Invalid index type: " + idxType.type);
                 return new FType(Type.NULL);
             }
             comms.add(new Instruction(Opcode.CONST_I32)); // multiply part of the index by the sub-array's size
-            comms.add(new Instruction(currFtype.returnType.arrSize));
+            // if not an array, it's arrSize defaults to 1
+            int arrSize = currFType.returnType.arrSize != null ? currFType.returnType.arrSize : 1;
+            comms.add(new Instruction(arrSize));
             comms.add(new Instruction(Opcode.MUL_I32));
             if (i != 0) {   // if not first, start adding up the indices
                 comms.add(new Instruction(Opcode.ADD_I32));
             }
-            currFtype = currFtype.returnType;
+            currFType = currFType.returnType;
         }
-        comms.add(new Instruction(Opcode.CONST_I32)); // add the start of the array to get the final index
-        comms.add(new Instruction(varInfo.addr));
-        comms.add(new Instruction(Opcode.ADD_I32));
-        comms.add(new Instruction(Opcode.SLOAD));   // and load the value
-        return currFtype;
+        boolean isIdPointer = false;
+        if(ctx.id() != null){
+            String id = ctx.id().ID().getText();
+            VariableInfo info = scopeManager.getVariableInfo(id);
+            isIdPointer = info.ftype.type == Type.POINTER;
+        }
+        comms.add(new Instruction(Opcode.ADD_I32)); // add calculated offset to the start addr pushed earlier
+        if(ctx.ptrExpr() != null || isIdPointer) {
+            comms.add(new Instruction(Opcode.SGLOAD));   // and load the value
+        } else {
+            comms.add(new Instruction(Opcode.SLOAD));
+        }
+        return currFType;
     }
 
     @Override
     public FType visitBlock(CoolangParser.BlockContext ctx) {
-        FType toReturn = new FType(Type.NULL);
+        FType toReturn = new FType(Type.VOID);
         for (CoolangParser.StatContext stat : ctx.stat()) {
             if (stat.returnStat() != null) {
                 return visit(stat);
@@ -122,7 +121,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             }
         }
         // function body instructions are pushed into the comms list.
-        // when the whole body is compiled, the new instructions are extracted from comms and
+        // when the entire body is compiled, the new instructions are extracted from comms and
         // pushed into the funcs list. The latter will be latter put at the beginning of the program code.
         int oldCommsSize = comms.size();
         int funStartAddr = funcs.size();
@@ -131,6 +130,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         // compile the function body
         scopeManager.pushFunctionScope(argTypes, argIDs);
         FType returnType;
+        // make sure bodies end with RET or VRET
         if (ctx.funDefBody().statBlock() != null) {
             returnType = visit(ctx.funDefBody().statBlock());
             if (returnType.type == Type.VOID && comms.get(comms.size() - 1).opcode != Opcode.VRET) {
@@ -138,7 +138,11 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             }
         } else {
             returnType = visit(ctx.funDefBody().expr());
-            comms.add(new Instruction(Opcode.RET)); // expr function bodies need explicit return
+            if (returnType.type == Type.VOID && comms.get(comms.size() - 1).opcode != Opcode.VRET) {
+                comms.add(new Instruction(Opcode.VRET));
+            } else if (comms.get(comms.size() - 1).opcode != Opcode.RET) {
+                comms.add(new Instruction(Opcode.RET));
+            }
         }
         scopeManager.popScope();
         List<Instruction> funcBody = comms.subList(oldCommsSize, comms.size());
@@ -153,7 +157,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         // functions' start addresses are pushed onto stack on declaration
         comms.add(new Instruction(Opcode.CONST_I32));
         comms.add(new Instruction(funStartAddr));
-        return new FType(Type.NULL);
+        return new FType(Type.VOID);
     }
 
     @Override
@@ -198,8 +202,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
 
     @Override
     public FType visitFunCall(CoolangParser.FunCallContext ctx) {
-        String id;
-        FType ftype;
+        String id = ctx.lvalue().getText();
         // arguments have to be put on the stack first
         List<FType> argFTypes = new ArrayList<>();
         CoolangParser.FunArgsContext actx = ctx.funArgs();
@@ -209,13 +212,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             }
         }
         // then push the function address
-        if (ctx.id() != null) {
-            id = ctx.id().getText();
-            ftype = visit(ctx.id());
-        } else {
-            id = ctx.idxAtom().ID().getText();
-            ftype = visit(ctx.idxAtom());
-        }
+        FType ftype = visit(ctx.lvalue());
         try {
             // make sure it's callable
             if (ftype.type != Type.FUNC) {
@@ -230,7 +227,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
                     throw new RuntimeException("Function expected arguments of types " + ftype.argFTypes + " but got " + argFTypes);
                 }
             }
-        } catch(RuntimeException e){
+        } catch (RuntimeException e) {
             errors.add(getErrorPos(ctx) + e.getMessage());
             return new FType(Type.NULL);
         }
@@ -254,38 +251,44 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     @Override
     public FType visitAssignment(CoolangParser.AssignmentContext ctx) {
         FType exprType = visit(ctx.expr());
-        boolean isIndexed = ctx.ID() == null;
-        String id;
-        FType ltype = null;
-        if (isIndexed) {
-            id = ctx.idxAtom().ID().getText();
-            ltype = visit(ctx.idxAtom());
-            comms.remove(comms.size() - 1); // remove idxAtom SLOAD so that address stays on the stack
-        } else {
-            id = ctx.ID().getText();
-        }
-        VariableInfo varInfo;
-        try {
-            varInfo = scopeManager.getVariableInfo(id);
-            if (isIndexed) {
-                if (ltype.type == Type.ARRAY) {
-                    throw new RuntimeException("Invalid assignment to an expression of type ARRAY");
-                } else if (!ltype.equals(exprType)) {
-                    throw new RuntimeException("Invalid assignment of expression of type " + exprType + " to an array of " + ltype);
-                }
-            } else varInfo.assign(id, exprType);
-        } catch (RuntimeException e) {
-            this.errors.add(getErrorPos(ctx) + e.getMessage());
-            return new FType(Type.NULL);
-        }
-        if (!isIndexed) {
+        String id = ctx.lvalue().getText();
+        if (ctx.lvalue().id() != null) {
+            VariableInfo varInfo;
+            try {
+                varInfo = scopeManager.getVariableInfo(id);
+                varInfo.assign(id, exprType);
+            } catch (RuntimeException e) {
+                this.errors.add(getErrorPos(ctx) + e.getMessage());
+                return new FType(Type.NULL);
+            }
             comms.add(new Instruction(Opcode.STORE));
             comms.add(new Instruction(varInfo.addr));
-        } else {
-            // needed values are already on the stack (value, address)
-            comms.add(new Instruction(Opcode.SSTORE));
         }
-        return new FType(Type.NULL);
+        else{ // pointer or array
+            FType ltype = visit(ctx.lvalue());
+            if(!ltype.equals(exprType)){
+                this.errors.add(getErrorPos(ctx) + "Can not assign value of type " + exprType + " to " + id + " of type " + ltype);
+                return new FType(Type.NULL);
+            }
+            //
+            boolean indexedIsPointer = false;
+            if(ctx.lvalue().idxAtom() != null) {
+                if(ctx.lvalue().idxAtom().id() != null) {
+                    String idxId = ctx.lvalue().idxAtom().id().getText();
+                    VariableInfo info = scopeManager.getVariableInfo(idxId); // no error, was visited earlier
+                    indexedIsPointer = info.ftype.type == Type.POINTER;
+                }
+            }
+            // remove the last SLOAD instr, to leave the address to write on top of the stack
+            comms.remove(comms.size() - 1);
+            if(ctx.lvalue().ptrExpr() != null || indexedIsPointer) {
+                comms.add(new Instruction(Opcode.SGSTORE));
+            } else {
+                comms.add(new Instruction(Opcode.SSTORE));
+
+            }
+        }
+        return new FType(Type.VOID);
     }
 
     @Override
@@ -300,27 +303,27 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         } catch (RuntimeException e) {
             errors.add(getErrorPos(ctx) + e.getMessage());
         }
-        return new FType(Type.NULL);
+        return new FType(Type.VOID);
     }
 
     @Override
     public FType visitDeclarationWithAssignment(CoolangParser.DeclarationWithAssignmentContext ctx) {
-        FType exprType = visit(ctx.expr());
-        FType type = visit(ctx.type());
-        if (!type.equals(exprType)) {
-            this.errors.add(getErrorPos(ctx) + "Tried to declare " + exprType.toString() + " to " + type);
-        }
+        FType exprFType = visit(ctx.expr());
+        FType ftype = visit(ctx.type());
         String id = ctx.ID().getText();
+        if (!ftype.equals(exprFType)) {
+            this.errors.add(getErrorPos(ctx) + "Tried to declare variable " + id + " of type " + exprFType.toString() + " with value of type " + ftype);
+        }
         boolean isConst = ctx.mutability() == null || ctx.mutability().MUTABLE() == null;
         try {
-            scopeManager.top().declare(type, id, isConst, 1);
+            scopeManager.top().declare(ftype, id, isConst, 1);
 
         } catch (RuntimeException e) {
             this.errors.add(getErrorPos(ctx) + e.getMessage());
         }
         // the value to store is already on top of the stack
-        // no need to use STORE here
-        return new FType(Type.NULL);
+        // no need to use STORE
+        return new FType(Type.VOID);
     }
 
     @Override
@@ -342,15 +345,22 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
 
     @Override
     public FType visitType(CoolangParser.TypeContext ctx) {
-        if (ctx.OSQR() != null) { // is an array type
-            FType elemFType = new FType(Type.typeFromString(ctx.getText().substring(0, ctx.getText().length() - 2)));
-            if (elemFType.type == Type.FUNC) {
-                elemFType = visit(ctx.funType());
+        int depth = ctx.MULT().size();
+        if( depth > 0){
+            FType baseFType = new FType(Type.typeFromString(ctx.getText().substring(0, ctx.getText().length() - depth)));
+            if (baseFType.type == Type.FUNC) {
+                baseFType = visit(ctx.funType());
             }
-            FType ret = new FType(Type.ARRAY);
-            ret.returnType = elemFType;
-            return ret;
+            FType rootFType = null;
+            // create a pointer pointing to pointer pointing to a pointer etc.
+            for(int i = 0; i < depth; i++){ // will be executed at least once
+                rootFType = new FType(Type.POINTER);
+                rootFType.returnType = baseFType;
+                baseFType = rootFType;
+            }
+            return rootFType;
         }
+        // not a pointer (nor an array, as there is no such type in grammar)
         Type type = Type.typeFromString(ctx.getText());
         if (type == Type.FUNC) {
             return visit(ctx.funType());
@@ -402,6 +412,16 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         return retTypes.get(0);
     }
 
+
+    @Override
+    public FType visitStat(CoolangParser.StatContext ctx) {
+        FType toReturn = null;
+        for(int i = 0; i < ctx.getChildCount(); i++) {
+            FType change = visit(ctx.getChild(i));
+            toReturn = change == null ? toReturn : change; // avoid semicolon statement causing null return
+        }
+        return toReturn;
+    }
     /*
     Cleans up all the variables created in its scope
      */
@@ -491,7 +511,7 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
 
     @Override
     public FType visitFunExpr(CoolangParser.FunExprContext ctx) {
-        return super.visitFunExpr(ctx);
+        return visit(ctx.funCall());
     }
 
     @Override
@@ -579,10 +599,8 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             subFtype.arrSize = sizes.get(i);
         }
         subFtype.returnType = finalType;
-        finalType.arrSize = 1; // though it's not really an array
-        scopeManager.top().declare(rootFtype, id, true, rootFtype.arrSize);    // TODO array always const? maybe change grammar
-        System.out.println(finalType);
-        if (finalType.type == Type.FUNC) {    // TODO add FILL-1 instr or smth
+        scopeManager.top().declare(rootFtype, id, true, rootFtype.arrSize); // array names always const
+        if (finalType.type == Type.FUNC) {    // TODO add FILL-1 instr?
             for (int i = 0; i < rootFtype.arrSize; i++) {
                 comms.add(new Instruction(Opcode.CONST_I32));
                 comms.add(new Instruction(-1));
@@ -591,7 +609,47 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             comms.add(new Instruction(Opcode.FILLZ));
             comms.add(new Instruction(rootFtype.arrSize));
         }
-        return new FType(Type.NULL);
+        return new FType(Type.VOID);
+    }
+
+    @Override
+    public FType visitPointerExpr(CoolangParser.PointerExprContext ctx){
+        return visit(ctx.ptrExpr());
+    }
+
+    @Override
+    public FType visitPtrExpr(CoolangParser.PtrExprContext ctx){
+        FType ftype = visit(ctx.expr());
+        if(ftype.type != Type.ARRAY && ftype.type != Type.POINTER){
+            errors.add(getErrorPos(ctx.expr()) + "Can not get value pointed by type " + ftype.type + " expected ARRAY or POINTER");
+            return new FType(Type.NULL);
+        } else {
+            // address to load from already on the stack
+            comms.add(new Instruction(Opcode.SGLOAD));
+        }
+        return ftype.returnType;
+    }
+
+    @Override
+    public FType visitAddressExpr(CoolangParser.AddressExprContext ctx){
+        FType ftype;
+        if(ctx.lvalue().ptrExpr() != null){ // &(*a)
+            return visit(ctx.lvalue().ptrExpr().expr()); // just ignore this & and next *
+        } else if(ctx.lvalue().idxAtom() != null){
+             ftype = visit(ctx.lvalue().idxAtom());
+            // the address is already on top
+            // nothing else to do
+        } else {    // id
+            // need to get the absolute address
+            VariableInfo rawInfo = scopeManager.getRawVariableInfo(ctx.lvalue().id().getText());
+            comms.add(new Instruction(Opcode.CONST_I32));
+            comms.add(new Instruction(rawInfo.addr));
+            ftype = rawInfo.ftype;
+        }
+        // with address left on the stack, return new pointer type
+        FType retType = new FType(Type.POINTER);
+        retType.returnType = ftype;
+        return retType;
     }
 
     @Override
@@ -677,14 +735,20 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
     public FType visitId(CoolangParser.IdContext ctx) {
         VariableInfo var;
         try {
-            var = scopeManager.getVariableInfo(ctx.getText());
+            var = scopeManager.getVariableInfo(ctx.ID().getText());
         } catch (RuntimeException e) {
             this.errors.add(getErrorPos(ctx) + e.getMessage());
             return new FType(Type.NULL);
         }
         // return value stored at the variable's address
-        comms.add(new Instruction(Opcode.LOAD));
-        comms.add(new Instruction(var.addr));
+        if (var.ftype.type != Type.ARRAY) {
+            // careful! Id variables are returned by value, to get address use VarInfo or remove the LOAD instruction
+            comms.add(new Instruction(Opcode.LOAD));    // push value at address
+            comms.add(new Instruction(var.addr));
+        } else {
+            comms.add(new Instruction(Opcode.CONST_I32)); // push address
+            comms.add(new Instruction(var.addr));
+        }
         return var.ftype;
     }
 
@@ -693,4 +757,14 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         return super.visitStringAtom(ctx);
     }
 
+    @Override
+    public FType visitLvalue(CoolangParser.LvalueContext ctx) {
+        if (ctx.id() != null) {
+            return visit(ctx.id());
+        } else if (ctx.idxAtom() != null){
+            return visit(ctx.idxAtom());
+        } else {
+            return visit(ctx.ptrExpr());
+        }
+    }
 }
