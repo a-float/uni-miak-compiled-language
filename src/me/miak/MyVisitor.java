@@ -255,7 +255,11 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
 
     @Override
     public FType visitOutStat(CoolangParser.OutStatContext ctx) {
-        visit(ctx.expr());
+        FType ftype = visit(ctx.expr());
+        if(ftype.type == Type.VOID){
+            errors.add(getErrorPos(ctx.expr()) + " Can not print value of type " + ftype);
+            return new FType(Type.NULL);
+        }
         comms.add(new Instruction(Opcode.PRINT));
         return new FType(Type.VOID);
     }

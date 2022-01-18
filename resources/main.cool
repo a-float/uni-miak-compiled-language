@@ -1,5 +1,15 @@
-mut a: int = 0;
-mut b: int = 1;
-mut c: int = 3;
+fun f1: (x: int) -> int = {
+    ret x;
+}
 
-print *(&a + 2);
+fun main: () -> int = {
+    fun f1: (x: int) -> int = {
+        ret x * 2;
+    }
+    print f1(5);
+    ret 1;
+}
+
+print f1(5);
+main();
+print f1(5);
