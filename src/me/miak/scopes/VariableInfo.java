@@ -16,7 +16,7 @@ public class VariableInfo{
 
     public void assign(String id, FType rightSideFType) {
         if (this.isConstant || this.ftype.type == Type.ARRAY) {
-            throw new RuntimeException("Can not assign to a constant variable " + id);
+            throw new RuntimeException("Assignment to a constant variable " + id);
         }
         if (this.ftype.type == Type.FUNC) {
             if (!this.ftype.equals(rightSideFType)) {

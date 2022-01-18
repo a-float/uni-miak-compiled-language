@@ -26,7 +26,6 @@ public class Main {
         } else {
             inputStream = CharStreams.fromString(input);
         }
-//        System.out.println(inputStream);
         List<Instruction> comms = new ArrayList<>();
 
         if (runParser(inputStream, comms)) {

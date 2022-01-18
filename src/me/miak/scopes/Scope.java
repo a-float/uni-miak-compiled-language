@@ -7,16 +7,12 @@ import java.util.Map;
 public class Scope {
     private int startAddr;
     private final Map<String, VariableInfo> map = new HashMap<>();
-    private final int framePointer;
     private int totalSize = 0;
+    public boolean isFunctionScope;
 
-    public Scope(int startAddr, int framePointer) {
+    public Scope(int startAddr, boolean isFunctionScope) {
         this.startAddr = startAddr;
-        this.framePointer = framePointer;
-    }
-
-    public int getFramePointer(){
-        return this.framePointer;
+        this.isFunctionScope = isFunctionScope;
     }
 
     public int getStartAddr() {

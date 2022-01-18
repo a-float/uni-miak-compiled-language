@@ -6,40 +6,36 @@ import java.util.Stack;
 
 public class ScopeManager {
     private final Stack<Scope> scopeStack;
-//    public final Scope globalScope = new Scope(0);
 
     public ScopeManager() {
         this.scopeStack = new Stack<>();
-        this.scopeStack.push(new Scope(0, 0));
+        this.scopeStack.push(new Scope(0, false));
+    }
+
+    public Scope global() {
+        return this.scopeStack.elementAt(0);
     }
 
     public Scope top() {
         return this.scopeStack.peek();
     }
 
+    /*
+    Searches for the variable in the scopes until the first function scope encountered.
+    If variable was not found, check if it's in the global scope, if not, it's undefined
+     */
     public VariableInfo getVariableInfo(String id) {
-        VariableInfo ret = null;
-        int scopeFP = 0;
+        VariableInfo ret;
         for (int i = scopeStack.size() - 1; i >= 0; i--) {
-            ret = this.scopeStack.elementAt(i).getVariableInfo(id);
-            if (ret != null){
-                scopeFP = this.scopeStack.elementAt(i).getFramePointer();
-                break;
-            }
-        }
-        if(ret == null){
-            throw new RuntimeException("Variable " + id + " is not defined");
-        }
-        // make variable address relative to the frame pointer
-        return new VariableInfo(ret.ftype, ret.isConstant, ret.size, ret.addr - top().getFramePointer() + scopeFP);
-    }
-
-    public VariableInfo getRawVariableInfo(String id){
-        VariableInfo ret = null;
-        for (int i = scopeStack.size() - 1; i >= 0; i--) {
-            ret = this.scopeStack.elementAt(i).getVariableInfo(id);
-            if (ret != null){
+            Scope scope = this.scopeStack.elementAt(i);
+            ret = scope.getVariableInfo(id);
+            if (ret != null) {
                 return ret;
+            }
+            if (scope.isFunctionScope) {
+                ret = this.global().getVariableInfo(id);
+                if (ret != null) return ret;
+                break;
             }
         }
         throw new RuntimeException("Variable " + id + " is not defined");
@@ -50,8 +46,7 @@ public class ScopeManager {
      */
     public void pushScope() {
         int startAddr = this.top().getEndAddr();
-        int fp = this.top().getFramePointer();
-        this.scopeStack.push(new Scope(startAddr, fp));
+        this.scopeStack.push(new Scope(startAddr, false));
     }
 
     /**
@@ -62,8 +57,7 @@ public class ScopeManager {
     }
 
     public void pushFunctionScope(List<FType> argTypes, List<String> argIDs) {
-        int fp = this.top().getEndAddr() + this.top().getFramePointer() + argTypes.size() + 3; // declared + args + argc + fp + sp
-        this.scopeStack.push(new Scope(0, fp));
+        this.scopeStack.push(new Scope(0, true));
         this.top().declareFunctionArgs(argTypes, argIDs);
     }
 }

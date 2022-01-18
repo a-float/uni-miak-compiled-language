@@ -1,11 +1,5 @@
-fun f: (x : int[]) -> void = {
-    for i in 0 to 3 by 1{
-        x[i] = i;
-    }
-}
+mut a: int = 0;
+mut b: int = 1;
+mut c: int = 3;
 
-const arr = int[4];
-f(arr);
-for i in 0 to 3 by 1{
-    print arr[i];
-}
+print *(&a + 2);

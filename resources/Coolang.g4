@@ -24,13 +24,12 @@ stat
  | arrayCreation
  | funCall SCOL
  | returnStat
- | BREAK SCOL
  | OTHER {System.err.println("unknown character: " + $OTHER.text);}
  ;
 
 returnStat: RETURN expr? SCOL;
 
-funDefinition: (FUN | mutability?) ID COL OPAR funDefinitionArgs? CPAR ARROW funRetType ASSIGN funDefBody;
+funDefinition: FUN ID COL OPAR funDefinitionArgs? CPAR ARROW funRetType ASSIGN funDefBody;
 
 funRetType: type | VOID_TYPE;
 
@@ -46,7 +45,9 @@ funDefinitionArgs
  : ID COL type (COMMA ID COL type)*
  ;
 
-funCall : lvalue OPAR funArgs? CPAR;
+funCall : lvalue funCallParentheses+;
+
+funCallParentheses: (OPAR funArgs? CPAR);
 
 funArgs
  : expr
@@ -63,14 +64,13 @@ declaration
  : mutability? ID COL type SCOL
  ;
 
-// TODO split into static array and dynamic array ('new' keyword?)
 arrayCreation : CONST ID ASSIGN type (OSQR expr CSQR)+ SCOL;
 
 declarationWithAssignment
  : mutability? ID COL type ASSIGN expr SCOL
  ;
 
-type: (INT_TYPE | STRING_TYPE | BOOL_TYPE | funType) MULT*;
+type: (INT_TYPE | BOOL_TYPE | funType) MULT*;
 
 funType: OPAR (type (COMMA type)*)? CPAR ARROW funRetType;
 
@@ -101,7 +101,7 @@ expr
  | NOT expr                             #notExpr
  | ptrExpr                              #pointerExpr
  | AMP lvalue                           #addressExpr
- | expr op=(MULT | DIV | MOD) expr      #multiplicationExpr
+ | expr op=(MULT | DIV) expr            #multiplicationExpr
  | expr op=(PLUS | MINUS) expr          #additiveExpr
  | expr op=(LTEQ | GTEQ | LT | GT) expr #relationalExpr
  | expr op=(EQ | NEQ) expr              #equalityExpr
@@ -110,7 +110,7 @@ expr
  | OPAR expr CPAR                       #parExpr
  | funCall                              #funExpr
  | atom                                 #atomExpr
- | MINUS expr                           #unaryMinusExpr
+  | MINUS expr                           #unaryMinusExpr
  ;
 
 atom
@@ -118,7 +118,6 @@ atom
  | (TRUE | FALSE)               #booleanAtom
  | id                           #idAtom
  | idxAtom                      #indexedAtom
- | STRING                       #stringAtom
  | lambda                       #lambdaAtom
  ;
 
@@ -144,19 +143,17 @@ PLUS : '+';
 MINUS : '-';
 MULT : '*';
 DIV : '/';
-MOD : '%';
 POW : '^';
 NOT : 'not';
 HASH: '#';
-BY: 'by';
-TO: 'to';
 AMP: '&';
 
 INT_TYPE: 'int';
-STRING_TYPE: 'string';
 BOOL_TYPE: 'bool';
 VOID_TYPE: 'void';
 
+TO: 'to';
+BY: 'by';
 THROUGH: '::';
 COL : ':';
 SCOL : ';';
@@ -174,7 +171,6 @@ RETURN : 'ret';
 
 FOR : 'for';
 IN : 'in';
-BREAK : 'break';
 IF : 'if';
 ELIF : 'elif';
 ELSE : 'else';
@@ -182,7 +178,6 @@ WHILE : 'while';
 
 TRUE : 'true';
 FALSE : 'false';
-NIL : 'nil';
 PRINT : 'print';
 
 ID
@@ -190,7 +185,7 @@ ID
  ;
 
 INT
- : MINUS?[0-9]+
+ : [0-9]+
  ;
 
 FLOAT

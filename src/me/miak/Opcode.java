@@ -19,21 +19,18 @@ public enum Opcode {
     STORE(16),
     SGSTORE(17),
     PRINT(18),
-    PRINTCH(19),
-    POP(20),
-    POPN(21),
-    CALL(22),
-    RET(23),
-    SCALL(24),
-    SLOAD(25),
-    SSTORE(26),
-    FILLZ(27),
-    VRET(28),
-    HALT(29);
+    POPN(19),
+    RET(20),
+    SCALL(21),
+    SLOAD(22),
+    SSTORE(23),
+    FILLZ(24),
+    VRET(25),
+    HALT(26);
 
     private final int code;
 
-    private Opcode(int code) {
+    Opcode(int code) {
         this.code = code;
     }
 

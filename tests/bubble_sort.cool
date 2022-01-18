@@ -1,0 +1,31 @@
+const swap: (int*, int*) -> void = (a: int*, b: int*) -> {
+    const tmp: int = *a;
+    *a = *b;
+    *b = tmp;
+};
+
+fun bubbleSort: (a: int*, size: int) -> void = {
+    mut done: bool = false;
+    while not done{
+        mut swapped: bool = false;
+        for idx in 0::(size-1)::1{
+           if a[idx] > a[idx+1]{
+                swap(&a[idx], &a[idx+1]);
+                swapped = true;
+           }
+        }
+        done = not swapped;
+    }
+}
+
+const arr = int[10];
+const size: int = 10;
+for i in 0::size::1{
+    arr[i] = size - i;
+    print arr[i];
+}
+print -111;
+bubbleSort(arr, size);
+for i in 0::size::1{
+    print arr[i];
+}

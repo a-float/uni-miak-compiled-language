@@ -1,9 +1,9 @@
 const arr = int[2][2][2];
 arr[1][0][1] = 11;
 
-for i in 0 to 2 by 1{
-    for j in 0 to 2 by 1{
-         for k in 0 to 2 by 1{
+for i in 0::2::1{
+    for j in 0::2::1{
+         for k in 0::2::1{
                 print arr[i][j][k];
             }
     }
