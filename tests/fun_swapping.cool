@@ -1,0 +1,16 @@
+mut f: (int) -> void;
+mut f2: () -> void;
+
+fun f1: () -> void = {
+    f = (x: int) -> {print x;};
+    f(5);
+    f2();
+}
+
+f2 = () -> {
+    f = (x: int) -> {print -x;};
+    f(5);
+    f1();
+};
+
+f1();
