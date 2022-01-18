@@ -1,10 +1,10 @@
-fun f1: (x: int) -> void = {
-    print x;
+fun f1: (x: int) -> int = {
+    ret x;
 }
 
 fun main: () -> int = {
-    fun f1: (x: int) -> void = {
-        print x * 2;
+    fun f1: (x: int) -> int = {
+        ret x * 2;
     }
     print f1(5);
     ret 1;
