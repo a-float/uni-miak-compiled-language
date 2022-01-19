@@ -67,13 +67,15 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
             currFType = currFType.returnType;
         }
         boolean isIdPointer = false;
+        boolean isGlobal = false;
         if (ctx.id() != null) {
             String id = ctx.id().ID().getText();
             VariableInfo info = scopeManager.getVariableInfo(id);
+            isGlobal = info == scopeManager.global().getVariableInfo(id);
             isIdPointer = info.ftype.type == Type.POINTER;
         }
         comms.add(new Instruction(Opcode.ADD_I32)); // add calculated offset to the start addr pushed earlier
-        if (ctx.ptrExpr() != null || isIdPointer) {
+        if (ctx.ptrExpr() != null || isIdPointer || isGlobal) {
             comms.add(new Instruction(Opcode.SGLOAD));
         } else {
             comms.add(new Instruction(Opcode.SLOAD));

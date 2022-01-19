@@ -7,7 +7,7 @@ fun test: (p: int*) -> void = {
     print arr[0];   // 6, assigned on line 2
     print p;        // 7, 0-5 for arr, 6 for test, 7 for a and p is pointing to a
     print p[0];     // 1, value pointed to by p
-    print *p;       // 1, same as above
+    print *p        // 1, same as above
 }
 
 const a: int = 1;
