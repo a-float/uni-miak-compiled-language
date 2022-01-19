@@ -1,15 +1,25 @@
-const arr = int[6];
-arr[0] = 6;
-
-fun test: (p: int*) -> void = {
-    *p = 9;
-    print arr;      // 0, arr is a global array name that is on the bottom of the stack
-    print arr[0];   // 6, assigned on line 2
-    print p;        // 7, 0-5 for arr, 6 for test, 7 for a and p is pointing to a
-    print p[0];     // 1, value pointed to by p
-    print *p;       // 1, same as above
+fun getGetter: () -> () -> () -> (int) -> int = {
+    ret () -> () -> (x: int) -> x * 2;
 }
 
-const a: int = 1;
-mut p: int* = &a;
-test(p);
+print getGetter()()()(3);   // 6
+
+print 4 + 5 * 2 + 3;    // 17
+
+fun fac_r: (n: int) -> int = {
+    if n == 0 or n == 1{
+        ret 1;
+    } else {
+        ret n*fac_r(n-1);
+    }
+}
+fun fac_i: (n: int) -> int = {
+    mut res: int = 1;
+    for i in 1 to n+1 by 1 {
+        res = res * i;
+    }
+    ret res;
+}
+
+print fac_r(5); // 120
+print fac_i(5); // 120

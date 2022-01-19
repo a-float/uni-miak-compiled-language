@@ -734,10 +734,10 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
         if (t2.type != Type.BOOL) {
             errors.add(getErrorPos(ctx) + "Expected BOOL got " + t2.type + ": " + ctx.expr(1).getText());
         }
-        comms.add(new Instruction(Opcode.ADD_I32)); // TODO could add OR vm instr (AND as well?)
+        comms.add(new Instruction(Opcode.ADD_I32));
         comms.add(new Instruction(Opcode.CONST_I32));
         comms.add(new Instruction(0));
-        comms.add(new Instruction(Opcode.LT_I32));
+        comms.add(new Instruction(Opcode.EQ_I32));
         comms.add(new Instruction(Opcode.NOT));
         return new FType(Type.BOOL);
     }

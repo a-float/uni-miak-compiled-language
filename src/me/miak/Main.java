@@ -28,7 +28,7 @@ public class Main {
 
         if (runParser(inputStream, comms)) {
             String result = comms.stream().map(i -> Integer.toString(i.resolve())).collect(Collectors.joining(","));
-            System.out.println(result);
+//            System.out.println(result);
             OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(outName));
             ByteBuffer buffer = ByteBuffer.allocate(comms.size() * 4);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
