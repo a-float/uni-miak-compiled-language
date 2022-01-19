@@ -16,7 +16,8 @@ import java.util.stream.Collectors;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        String file = args.length == 1 ? args[0] : null;
+        String file = args.length >= 1 ? args[0] : null;
+        String outName = args.length > 2 ? args[1] : "out.cexe";
         CharStream inputStream;
         if (file == null) {
             System.out.println("No source file specified");
@@ -28,15 +29,15 @@ public class Main {
         if (runParser(inputStream, comms)) {
             String result = comms.stream().map(i -> Integer.toString(i.resolve())).collect(Collectors.joining(","));
             System.out.println(result);
-            OutputStream outputStream = new BufferedOutputStream(new FileOutputStream("out.cexe"));
-            ByteBuffer buffer = ByteBuffer.allocate(comms.size()*4);
+            OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(outName));
+            ByteBuffer buffer = ByteBuffer.allocate(comms.size() * 4);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
-            for(Instruction comm : comms){
+            for (Instruction comm : comms) {
                 buffer.putInt(comm.resolve());
             }
             outputStream.write(buffer.array());
             outputStream.close();
-            System.out.println("Compiled program saved to out.cexe");
+            System.out.println("Compiled program saved to " + outName);
         } else {
             System.out.println("Compilation failed");
         }
