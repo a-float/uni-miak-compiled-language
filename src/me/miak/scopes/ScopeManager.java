@@ -6,6 +6,7 @@ import java.util.Stack;
 
 public class ScopeManager {
     private final Stack<Scope> scopeStack;
+    private int functionDepth = 0;
 
     public ScopeManager() {
         this.scopeStack = new Stack<>();
@@ -53,11 +54,17 @@ public class ScopeManager {
      * pops the topmost scope
      */
     public void popScope() {
+        if(this.top().isFunctionScope)this.functionDepth -= 1;
         this.scopeStack.pop();
     }
 
     public void pushFunctionScope(List<FType> argTypes, List<String> argIDs) {
         this.scopeStack.push(new Scope(0, true));
         this.top().declareFunctionArgs(argTypes, argIDs);
+        this.functionDepth += 1;
+    }
+
+    public boolean isInFunction(){
+        return this.functionDepth != 0;
     }
 }

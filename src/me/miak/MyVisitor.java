@@ -97,6 +97,10 @@ public class MyVisitor extends CoolangBaseVisitor<FType> {
 
     @Override
     public FType visitReturnStat(CoolangParser.ReturnStatContext ctx) {
+        if (!scopeManager.isInFunction()){
+            errors.add(getErrorPos(ctx) + "Return outside function body");
+            return new FType(Type.NULL);
+        }
         if (ctx.expr() != null) {
             FType returnType = visit(ctx.expr());
             comms.add(new Instruction(Opcode.RET));

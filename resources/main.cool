@@ -20,6 +20,6 @@ fun fac_i: (n: int) -> int = {
     }
     ret res;
 }
-
+ret 123;
 print fac_r(5); // 120
 print fac_i(5); // 120
