@@ -24,12 +24,12 @@ int read_program_from_file(std::vector<int32_t> &vec, char *filename) {
 
 int main(int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: [--debug]? %s [.cexe file] [stack size]", argv[0]);
+        printf("Usage: %s [--debug]? [.cexe file] [stack size]", argv[0]);
         return 0;
     }
     bool debug = strcmp(argv[1], "--debug") == 0;
     if (argc < 4 && debug) {
-        printf("Usage: [--debug]? %s [.cexe file] [stack size]", argv[0]);
+        printf("Usage: %s [--debug]? [.cexe file] [stack size]", argv[0]);
         return 0;
     }
 

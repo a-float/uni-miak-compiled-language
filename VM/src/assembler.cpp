@@ -131,7 +131,7 @@ void deassemble(char *filename) {
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        cout << "Invalid usage. Pass one or more files to assemble.";
+        printf("Usage: %s [-d]? [filename]+", argv[0]);
         return 0;
     }
     if (strcmp(argv[1], "-d") == 0) {
