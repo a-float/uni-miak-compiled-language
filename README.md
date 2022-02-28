@@ -145,8 +145,16 @@ It has stack pointer, frame pointer, program counter, the stack itself and the c
 There is no heap and dynamic memory allocation.
 
 # Usage
-Necessary files are stored in the `builds` directory  
-`java -jar cool-compiler.jar [source] [out]` compiles the source file and saves it to the out file
-`vm.exe [--debug]? [.cexe file] [stack size]` execute compiled .cexe file on the vm. Enable debug flag for step by step execution
-`assembler.exe [filename]+` assemble specified coolang assembly code into machine code
-`assembler.exe -d [filename]+` disassemble the coolang machine code into a readable format
+All the necessary files are stored in the `build` directory  
+  
+Compile the source file and saves it to the out file:  
+`java -jar cool-compiler.jar [source] [out]`   
+  
+Execute compiled .cexe file on the vm. Enable debug flag for step by step logging:  
+`vm.exe [--debug]? [.cexe file] [stack size]`  
+  
+Assemble specified coolang assembly code into machine code:  
+`assembler.exe [filename]+`  
+  
+Disassemble the coolang machine code into a readable format:  
+`assembler.exe -d [filename]+`  
