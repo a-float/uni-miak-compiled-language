@@ -1,5 +1,5 @@
 # Coolang Compiler
-## Statically typed language compiler with a VM, compiler and assembler
+## Statically typed language compiler with a VM and assembler
 
 Coolang features:
 - defining read-write and read-only variables
